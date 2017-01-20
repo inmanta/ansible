@@ -51,7 +51,6 @@ class TaskHandler(ResourceHandler):
         playbook["tasks"] = tasks
         playbook = [playbook]
         file_content = yaml.dump(playbook, default_flow_style=False)
-        print(file_content)
         return file_content
 
     def run_ansible_cmd(self, resource, dry_run=False):
