@@ -53,7 +53,7 @@ class TaskHandler(ResourceHandler):
         file_content = yaml.dump(playbook, default_flow_style=False)
         return file_content
 
-    def run_ansible_cmd(self, resource, dry_run=False):
+    def run_ansible_cmd(self, ctx, resource, dry_run=False):
         tmpfile = None
         playfile = None
         try:
@@ -93,29 +93,21 @@ class TaskHandler(ResourceHandler):
             if tmpfile is None:
                 os.remove(playfile)
 
-    def process_result(self, resource, json_data):
+    def process_result(self, ctx, resource, json_data):
         # find the task
         for play in json_data["plays"]:
             for task in play["tasks"]:
                 if task["task"]["name"] == resource.name:
                     if resource.host not in task["hosts"]:
                         raise Exception("The task was not executed correctly on %s" % resource.host)
-                    
+
                     changed = task["hosts"][resource.host]["changed"]
                     log_msg = ""
                     if "result" in task["hosts"][resource.host]:
-                        log_msg = task["hosts"][resource.host]["result"]
+                        ctx.info("result: %(result)s", result=task["hosts"][resource.host]["result"])
 
                     if "msg" in task["hosts"][resource.host]:
-                        log_msg += task["hosts"][resource.host]["msg"]
-
-                    changes = None
-                    if "changes" in task["hosts"][resource.host]:
-                        changes = task["hosts"][resource.host]["changes"]
-
-                    return {"changed": changed, "changes": changes, "log_msg": log_msg}
-
-        return {}
+                        ctx.info("msg: %(msg)s", msg=task["hosts"][resource.host]["result"])
 
     def execute(self, resource, dry_run=False):
         """
@@ -124,36 +116,31 @@ class TaskHandler(ResourceHandler):
         results = {"changed": False, "changes": {}, "status": "nop", "log_msg": ""}
 
         try:
-            self.pre(resource)
+            self.pre(ctx, resource)
 
             if resource.require_failed:
-                LOGGER.info("Skipping %s because of failed dependencies" % resource.id)
-                results["status"] = "skipped"
+                ctx.info(msg="Skipping %(resource_id)s because of failed dependencies", resource_id=resource.id)
+                ctx.set_status(const.ResourceState.skipped)
+                return
 
-            retcode, output = self.run_ansible_cmd(resource, dry_run)
-            data = self.process_result(resource, output)
+            retcode, output = self.run_ansible_cmd(ctx, resource, dry_run)
+            self.process_result(ctx, resource, output)
             if retcode == 0:
-                results["status"] = "deployed"
+                if not dry_run:
+                    self.do_changes(ctx, resource, changes)
+                    ctx.set_status(const.ResourceState.deployed)
+
+                else:
+                    ctx.set_status(const.ResourceState.dry)
             else:
-                results["status"] = "failed"
+                ctx.set_status(const.ResourceState.failed)
 
-            if "changed" in data:
-                results["changed"] = data["changed"]
-                if results["changed"]:
-                    LOGGER.info("%s was changed" % resource.id)
-            
-            if "changes" in data:
-                results["changes"] = data["changes"]
-
-            if "log_msg" in data:
-                results["changes"] = data["changes"]
-
-            self.post(resource)
+            self.post(ctx, resource)
+        except SkipResource as e:
+            ctx.set_status(const.ResourceState.skipped)
+            ctx.warning(msg="Resource %(resource_id)s was skipped: %(reason)s", resource_id=resource.id, reason=e.args)
 
         except Exception as e:
-            LOGGER.exception("An error occurred during deployment of %s" % resource.id)
-            results["log_msg"] = repr(e)
-            results["status"] = "failed"
-
-        return results
-
+            ctx.set_status(const.ResourceState.failed)
+            ctx.exception("An error occurred during deployment of %(resource_id)s (excp: %(exception)s",
+                          resource_id=resource.id, exception=repr(e), traceback=traceback.format_exc())
