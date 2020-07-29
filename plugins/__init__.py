@@ -16,18 +16,19 @@
     Contact: code@inmanta.com
 """
 
-import tempfile
-import os
-import re
 import json
 import logging
-import copy
+import os
+import tempfile
+import traceback
 
 import yaml
-from inmanta.agent.handler import provider, ResourceHandler, CRUDHandler
-from inmanta.resources import Resource, resource, ResourceNotFoundExcpetion
+from inmanta import const
+from inmanta.agent.handler import ResourceHandler, SkipResource, provider
+from inmanta.resources import Resource, resource
 
 LOGGER = logging.getLogger(__name__)
+
 
 @resource("ansible::Task", agent="agent", id_attribute="name")
 class Task(Resource):
@@ -43,10 +44,7 @@ class TaskHandler(ResourceHandler):
     def generate_playbook(self, resource):
         playbook = {"hosts": resource.host, "user": "root"}
         tasks = []
-        tasks.append({
-            "name": resource.name,
-            resource.module: resource.args
-        })
+        tasks.append({"name": resource.name, resource.module: resource.args})
 
         playbook["tasks"] = tasks
         playbook = [playbook]
@@ -84,7 +82,9 @@ class TaskHandler(ResourceHandler):
             out, err, retcode = self._io.run("ansible-playbook", cmd, env=env)
 
             if retcode > 0:
-                raise Exception("Ansible module failed: stdout: (%s), stderr(%s)" % (out, err))
+                raise Exception(
+                    "Ansible module failed: stdout: (%s), stderr(%s)" % (out, err)
+                )
             return retcode, self.parse_output(out)
 
         finally:
@@ -99,27 +99,34 @@ class TaskHandler(ResourceHandler):
             for task in play["tasks"]:
                 if task["task"]["name"] == resource.name:
                     if resource.host not in task["hosts"]:
-                        raise Exception("The task was not executed correctly on %s" % resource.host)
+                        raise Exception(
+                            "The task was not executed correctly on %s" % resource.host
+                        )
 
-                    changed = task["hosts"][resource.host]["changed"]
-                    log_msg = ""
                     if "result" in task["hosts"][resource.host]:
-                        ctx.info("result: %(result)s", result=task["hosts"][resource.host]["result"])
+                        ctx.info(
+                            "result: %(result)s",
+                            result=task["hosts"][resource.host]["result"],
+                        )
 
                     if "msg" in task["hosts"][resource.host]:
-                        ctx.info("msg: %(msg)s", msg=task["hosts"][resource.host]["result"])
+                        ctx.info(
+                            "msg: %(msg)s", msg=task["hosts"][resource.host]["result"]
+                        )
 
-    def execute(self, resource, dry_run=False):
+    def execute(self, ctx, resource, dry_run=False):
         """
             Update the given resource
         """
-        results = {"changed": False, "changes": {}, "status": "nop", "log_msg": ""}
 
         try:
             self.pre(ctx, resource)
 
             if resource.require_failed:
-                ctx.info(msg="Skipping %(resource_id)s because of failed dependencies", resource_id=resource.id)
+                ctx.info(
+                    msg="Skipping %(resource_id)s because of failed dependencies",
+                    resource_id=resource.id,
+                )
                 ctx.set_status(const.ResourceState.skipped)
                 return
 
@@ -138,9 +145,17 @@ class TaskHandler(ResourceHandler):
             self.post(ctx, resource)
         except SkipResource as e:
             ctx.set_status(const.ResourceState.skipped)
-            ctx.warning(msg="Resource %(resource_id)s was skipped: %(reason)s", resource_id=resource.id, reason=e.args)
+            ctx.warning(
+                msg="Resource %(resource_id)s was skipped: %(reason)s",
+                resource_id=resource.id,
+                reason=e.args,
+            )
 
         except Exception as e:
             ctx.set_status(const.ResourceState.failed)
-            ctx.exception("An error occurred during deployment of %(resource_id)s (excp: %(exception)s",
-                          resource_id=resource.id, exception=repr(e), traceback=traceback.format_exc())
+            ctx.exception(
+                "An error occurred during deployment of %(resource_id)s (excp: %(exception)s",
+                resource_id=resource.id,
+                exception=repr(e),
+                traceback=traceback.format_exc(),
+            )
