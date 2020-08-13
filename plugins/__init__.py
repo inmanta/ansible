@@ -134,7 +134,6 @@ class TaskHandler(ResourceHandler):
             self.process_result(ctx, resource, output)
             if retcode == 0:
                 if not dry_run:
-                    self.do_changes(ctx, resource, changes)
                     ctx.set_status(const.ResourceState.deployed)
 
                 else:
