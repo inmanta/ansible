@@ -116,7 +116,7 @@ class TaskHandler(ResourceHandler):
 
     def execute(self, ctx, resource, dry_run=False):
         """
-            Update the given resource
+        Update the given resource
         """
 
         try:
