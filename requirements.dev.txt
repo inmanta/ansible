@@ -13,7 +13,7 @@ arrow==0.17.0
 asyncpg==0.21.0
 attrs==20.3.0
 binaryornot==0.4.4
-certifi==2020.11.8
+certifi==2020.12.5
 cffi==1.14.4
 chardet==3.0.4
 click==7.1.2
