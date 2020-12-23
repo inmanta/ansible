@@ -44,7 +44,7 @@ pycparser==2.20
 pydantic==1.7.3
 pyflakes==2.2.0
 pyformance==0.4
-PyJWT==1.7.1
+PyJWT==2.0.0
 pyparsing==2.4.7
 pytest==6.2.1
 python-dateutil==2.8.1
