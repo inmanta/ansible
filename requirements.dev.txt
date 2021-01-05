@@ -24,7 +24,7 @@ dataclasses==0.7;python_version<'3.7'
 docstring-parser==0.7.3
 entrypoints==0.3
 execnet==1.7.1
-idna==2.10
+idna==3.1
 importlib-metadata==3.3.0
 Jinja2==2.11.2
 jinja2-time==0.2.0
