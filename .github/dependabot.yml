@@ -1,0 +1,14 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 99
+  ignore:
+  - dependency-name: chardet
+    versions:
+    - "> 3.0.4"
+  - dependency-name: idna
+    versions:
+    - ">= 3.a, < 4"
