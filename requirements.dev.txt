@@ -1,2 +1,2 @@
 pytest-inmanta
-inmanta-dev-dependencies[module,async]==2.27.0
+inmanta-dev-dependencies[module,async]==2.28.0
